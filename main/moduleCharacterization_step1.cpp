@@ -327,8 +327,9 @@ int main(int argc, char** argv) {
     std::map<int,bool> acceptEvent;
 
 
-    std::map<int,TH1F*> h1_events_type;
-    std::map<int,TH1F*> h1_events_type_REF;
+	std::map<int,TH1F*> h1_events_type;
+	std::map<int,TH1F*> h1_adjacentBars;
+    TH1F* h1_events_type_REF = NULL;
     std::map<int,TH1F*> h1_events_type_3;	
 
 	int nActiveBarsArray_ext;
@@ -437,14 +438,15 @@ int main(int argc, char** argv) {
 	            c[index] -> cd();
 	            c[index] ->SetLogy();
 	            h1_energyLR_ext[index] = new TH1F(Form("h1_energy_external_barL-R_Vov%.2f_th%02.0f",Vov,vth),"",map_energyBins[Vov],map_energyMins[Vov],map_energyMaxs[Vov]);
-			    h1_events_type_REF[index] = new TH1F(Form("h1_events_type_REF_Vov%.2f_th%02.0f",Vov,vth),"",16,0.5,16.5);
 				if(useTrackInfo){
 					h2_xy_REF[index] = new TH2F(Form("h2_trackInfo_REF_Vov%.2f_th%02.0f",Vov,vth),Form("h2_trackInfo_REF_Vov%.2f_th%02.0f",Vov,vth),100,-100,100,100,-100,100);
 				}
 	        }
-	
+	        if (h1_events_type_REF == NULL){
+	            h1_events_type_REF = new TH1F(Form("h1_events_type_REF_Vov3.50_th30"),"",16,0.5,16.5);
+	        }
 	        acceptEvent[entry] = true;
-	        h1_events_type_REF[index] ->Fill(nActiveBarsArray_ext);
+	        h1_events_type_REF ->Fill(nActiveBarsArray_ext);
 	        h1_energyLR_ext[index] -> Fill(0.5*(energyL_ext + energyR_ext));
             
 			float totL_ext    = 0.001*(*tot)[channelIdx[chL_ext]];              
@@ -704,8 +706,8 @@ int main(int argc, char** argv) {
 		if(h1_events_type[index2]==NULL){
 			h1_events_type[index2] = new TH1F(Form("h1_events_type_Vov%.2f_th%02.0f",Vov,vth),"",16,0.5,16.5);
 			h1_events_type_3[index2] = new TH1F(Form("h1_events_type3_Vov%.2f_th%02.0f",Vov,vth),"",3,0.5,3.5);
+			h1_adjacentBars[index2] = new TH1F(Form("h1_adjacentBars_Vov%.2f_th%02.0f",Vov,vth),"",16,0.5,16.5);
 		}
-
         for(unsigned int iBar = 0; iBar < channelMapping.size()/2; ++iBar) {
 	        nBarsVeto[iBar] = 0;
 	
@@ -739,6 +741,23 @@ int main(int argc, char** argv) {
 	            }
 	        }
         }// end loop over bars
+		if(nActiveBarsArray>=1){
+			int nAdjacentBars = 0;
+			int maxAdjacentBars = 0;
+			for(unsigned int iBar = 0; iBar < channelMapping.size()/2; ++iBar){
+				bool isActive = (totL[iBar]>-10 && totR[iBar]>-10 && totL[iBar]<50 && totR[iBar]<50 && energyL[iBar]>0 && energyR[iBar]>0);
+				if(isActive){
+					nAdjacentBars+=1;
+					if(nAdjacentBars>maxAdjacentBars){
+						maxAdjacentBars=nAdjacentBars;
+					}
+				}
+				else nAdjacentBars=0;
+			}
+			if(nActiveBarsArray == maxAdjacentBars){
+				h1_adjacentBars[index2]->Fill(nActiveBarsArray);
+			}
+		}
 		h1_events_type[index2]->Fill(nActiveBarsArray);
 		h1_events_type_3[index2]->Fill(nActiveBarsArray);
         
@@ -1231,7 +1250,7 @@ int main(int argc, char** argv) {
 	         << 100.*post_counter/mio_counter <<"%) [post] \t"<< pre_counter<<" ("<<100.*pre_counter/mio_counter <<"%) [pre]   double events\n"/*<<bar0_counter<<" [post 0] \t"<<bar15_counter<<" [pre 15]   double events\ndifference between all pre and post events: "<<pre_post_diff<<"\n"*/
 			 <<prepost_counter<<" (" << 100.*prepost_counter/mio_counter << "%) triple events"<<std::endl;
     
-	std::cout<<"\nExtra events = "<<extrass<<" (" << 100.* extrass/mio_counter << "%)\n"<<std::endl;
+	std::cout<<"\nNon adjacent events = "<<extrass<<" (" << 100.* extrass/mio_counter << "%)\n"<<std::endl;
 	std::cout<<"\nEvents in reference module: "<<count_ref<<" ("<<100.* count_ref/mio_counter<<"%)\n"<<std::endl;
     /*
 	std::cout<<"events with th 7: "<<mio_counter7<<" (" << 100.*mio_counter7/mio_counter << "%).\n"<<single_counter7<<" (" << 100.*single_counter7/mio_counter7 << "%) single events\n"<< post_counter7<<" ("
@@ -1253,12 +1272,43 @@ int main(int argc, char** argv) {
 	std::cout<<"Threshold 11 started with "<<c_entry11<<" events.  Accepted "<<mio_counter11<<" events (" << 100.*mio_counter11/c_entry11 << "%)."<<std::endl;
 	std::cout<<"Threshold 15 started with "<<c_entry15<<" events.  Accepted "<<mio_counter15<<" events (" << 100.*mio_counter15/c_entry15 << "%).\n"<<std::endl; 
     */
-    std::cout<<"Total number of events with more than 3 active bars: "<<multi_counter<<" (" << 100.*multi_counter/mio_counter << "%).\n"<<std::endl;
+    //std::cout<<"Total number of events with more than 3 active bars: "<<multi_counter<<" (" << 100.*multi_counter/mio_counter << "%).\n"<<std::endl;
     if(useTrackInfo){
 		std::cout<<"Total number of events with xy info: "<<xy_counter0<<" (" << 100.*xy_counter0/nEntries << "%).\n"<<std::endl;
 		std::cout<<"Total number of accepted events with xy info: "<<xy_counter<<" (" << 100.*xy_counter/mio_counter << "%).\n"<<std::endl;
 	}
 	
+	
+	/*int vth_values[] = {7,11,15};
+	for( int vth : vth_values){
+		int Vov = 1.25*10000;
+		int index2 = Vov + vth;
+		int tot_entries = h1_adjacentBars[index2]->GetEntries();
+		std::cout<<"\nFor th: "<<vth<<"\tTot entries: "<< tot_entries <<std::endl;
+		//for (int i=1;i<=16;i++){
+            //std::cout<< " "<<i<<" adjacent bars: "<< h1_adjacentBars[index2]->GetBinContent(i) << " (" << 100.*h1_adjacentBars[index2]->GetBinContent(i)/tot_entries << "%)  \t NON adjacent: "<< h1_events_type[index2]->GetBinContent(i) - h1_adjacentBars[index2]->GetBinContent(i) << std::endl;
+		//}
+		int tot_entries_3 = h1_adjacentBars[index2]->GetBinContent(1) + h1_adjacentBars[index2]->GetBinContent(2) + h1_adjacentBars[index2]->GetBinContent(3);
+        std::cout<<"\ntot entries with max 3 active bars: "<< tot_entries_3 <<" (" << 100.*tot_entries_3/tot_entries << "%)" <<std::endl;
+	}*/
+	int tot_entries_all_adj = h1_adjacentBars[12507]->Integral() + h1_adjacentBars[12511]->Integral() + h1_adjacentBars[12515]->Integral();
+	int tot_entries_7_adj = h1_adjacentBars[12507]->Integral();
+	int tot_entries_11_adj = h1_adjacentBars[12511]->Integral();
+	int tot_entries_15_adj = h1_adjacentBars[12515]->Integral();
+	int tot_entries_all = h1_events_type[12507]->Integral() + h1_events_type[12511]->Integral() + h1_events_type[12515]->Integral();
+	int tot_entries_7 = h1_events_type[12507]->Integral();
+	int tot_entries_11 = h1_events_type[12511]->Integral();	
+	int tot_entries_15 = h1_events_type[12515]->Integral();
+    float perc_entries_adj = 100.*tot_entries_all_adj/tot_entries_all;
+	float perc_entries_7_adj = 100.*tot_entries_7_adj/tot_entries_7;
+	float perc_entries_11_adj = 100.*tot_entries_11_adj/tot_entries_11;
+	float perc_entries_15_adj = 100.*tot_entries_15_adj/tot_entries_15;
+	std::cout<<"\nTot entries: "<< tot_entries_all<<"\ttot entries with adjacent bars: "<<tot_entries_all_adj <<"( "<<perc_entries_adj<<" % )"<<std::endl;
+    std::cout<<"\nTot entries (th 7): "<< tot_entries_7<<"\twith adjacent bars: "<<tot_entries_7_adj <<"( "<<perc_entries_7_adj<<" % )"<<std::endl;
+    std::cout<<"Tot entries (th 11): "<< tot_entries_11<<"\twith adjacent bars: "<<tot_entries_11_adj <<"( "<<perc_entries_11_adj<<" % )"<<std::endl;
+	std::cout<<"Tot entries (th 15): "<< tot_entries_15<<"\twith adjacent bars: "<<tot_entries_15_adj <<"( "<<perc_entries_15_adj<<" % )"<<std::endl;
+   
+
     int bytes = outFile -> Write();
     std::cout << "============================================"  << std::endl;
     std::cout << "nr of  B written:  " << int(bytes)             << std::endl;

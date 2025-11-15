@@ -93,7 +93,7 @@ def getTimeResolution(h1_deltaT,hit):
    return tRes
 
 
-
+# a specific function to compute deltaT for single hits using a sum of two gaussian, not used anymore 
 def getTimeResolution_S(h1_deltaT):
     tRes=[-1,-1,-1,-1]
 
@@ -183,14 +183,15 @@ cols = { 0.50 : 51,
 label_list = (args.inputLabels.split(','))
 print(label_list)
 
-# resolution mode : 0 : /1;  1: /sqrt(2) if CTR, 2: /2 if TDiff
+# resolution mode : 0 : /1;  1: /sqrt(2) if CTR, 2: /2 if TDiff , 3: sum in quadrature with REF time resolution 
 kscale = 2.
 if (args.resMode == 0): kscale = 1
 if (args.resMode == 1): kscale = math.sqrt(2)
 
 peaks=[0]
+#enBins=[1,2,3,4]
 enBins=[1]
-
+enBinsCenter={1:0.55,2:1.05,3:1.55,4:2.05}
 # --- prepare output dir 
 if (os.path.isdir(outdir) == False):
     os.system('mkdir %s'%outdir)
@@ -217,7 +218,8 @@ thRef = 11
 bars = []
 thresholds = []
 Vovs = [] 
-Hits = [1,2,3]
+#Hits = [1,2,3]
+Hits = [1,2]
 for label in label_list:
     inputFile = None
     inputFile = ROOT.TFile.Open(inputdir+'/moduleCharacterization_step2_%s.root'%label)
@@ -256,7 +258,11 @@ print('thresholds:', thresholds)
 g_deltaT_corr_vs_bars={} #g[Vov,th,energyBin,hits]
 g_deltaT_bestth_vs_bars={}
 g_deltaT_single_vs_bars={}
+g_deltaT_thBest_vs_enBin={}
 new_selection = True
+
+time_res_REF = 28 #hardcoded??
+
 # --- time resolution
 tRes_spread={}
 tRes_best={}
@@ -284,6 +290,7 @@ if(new_selection):
                 for hit in Hits:
                     g_deltaT_corr_vs_bars[vov,thr,enBin,hit]=ROOT.TGraphErrors()
                     g_deltaT_bestth_vs_bars[vov,enBin,hit]=ROOT.TGraphErrors()
+                    g_deltaT_thBest_vs_enBin[vov,hit]=ROOT.TGraphErrors()
 
     # --- Read the histograms from moduleCharacterization_step2 file
     for label in label_list:
@@ -298,12 +305,14 @@ if(new_selection):
                     for enBin in enBins:
                         for hit in Hits:
                             #h1_deltaT_Corr = inputFile.Get('h1_deltaT__bars%02d-%02d_Vov%.2f_th%02d_energyBin%02d_%02dHits'%(bar,bar+1, vov, thr, enBin,hit))
+                            #h1_deltaT_Corr = inputFile.Get('h1_deltaT_w_bars%02d-%02d_Vov%.2f_th%02d_energyBin%02d_%02dHits'%(bar,bar+1, vov, thr, enBin,hit))
+
                             #h1_deltaT_Corr =inputFile.Get('h1_deltaT_energyRatioPhaseCorr_bars%02d-%02d_Vov%.2f_th%02d_energyBin%02d_%02dHits'%(bar,bar+1, vov, thr, enBin,hit))
-                            #h1_deltaT_Corr =inputFile.Get('h1_deltaT_energyRatiCorr_ave_bars%02d-%02d_Vov%.2f_th%02d_energyBin%02d_%02dHits'%(bar,bar+1, vov, thr, enBin,hit))
+                            #h1_deltaT_Corr =inputFile.Get('h1_deltaT_w_energyRatioPhaseCorr_bars%02d-%02d_Vov%.2f_th%02d_energyBin%02d_%02dHits'%(bar,bar+1, vov, thr, enBin,hit))
+                            #h1_deltaT_Corr =inputFile.Get('h1_deltaT_energyRatioCorr_ave_bars%02d-%02d_Vov%.2f_th%02d_energyBin%02d_%02dHits'%(bar,bar+1, vov, thr, enBin,hit))
                              
-                            #h1_deltaT_w = inputFile.Get('h1_deltaT_w_bars%02d-%02d_Vov%.2f_th%02d_energyBin%02d_%02dHits'%(bar,bar+1, vov, thr, enBin,hit))
-                            h1_deltaT_Corr = inputFile.Get('h1_deltaT_energyRatioPhaseCorr_bar%02dL-R_Vov%.02f_th%02d_energyBin%02d_%02dHits'%(bar, vov, thr, enBin,hit))
-                            #h1_deltaT_Corr = inputFile.Get('h1_deltaT_energyRatioCorr_totRatioCorr_phaseCorr_bar%02dL-R_Vov%.02f_th%02d_energyBin%02d_%02dHits'%(bar, vov, thr, enBin,hit))
+                            #h1_deltaT_Corr = inputFile.Get('h1_deltaT_energyRatioPhaseCorr_bar%02dL-R_Vov%.02f_th%02d_energyBin%02d_%02dHits'%(bar, vov, thr, enBin,hit))
+                            h1_deltaT_Corr = inputFile.Get('h1_deltaT_energyRatioCorr_totRatioCorr_phaseCorr_bar%02dL-R_Vov%.02f_th%02d_energyBin%02d_%02dHits'%(bar, vov, thr, enBin,hit))
                             
                             if not h1_deltaT_Corr:
                                 #if hit==1 or hit==3: continue
@@ -332,6 +341,7 @@ if(new_selection):
                             
                                 
         for bar in bars:
+            if bar == 0 : continue
             for vov in Vovs:
                 for enBin in enBins:
                     for hit in Hits:
@@ -339,7 +349,7 @@ if(new_selection):
                             index=g_deltaT_bestth_vs_bars[vov,enBin,hit].GetN()
                             g_deltaT_bestth_vs_bars[vov,enBin,hit].SetPoint(index,bar,tRes_best[bar,vov,enBin,hit][0]/kscale)
                             g_deltaT_bestth_vs_bars[vov,enBin,hit].SetPointError(index,0,tRes_best[bar,vov,enBin,hit][1]/kscale)
-    
+                                
     print("Average time resolution for: ")
     for key, graph in g_deltaT_corr_vs_bars.items():
         vov, thr, enBin, hit = key
@@ -395,7 +405,7 @@ if(new_selection):
         if(tRes_ave==0 ): continue
         else:
             print(f"Vov{vov} th{thr} enBin{enBin} hits{hit}: {tRes_ave:.01f} [ps] spread (RMS) of {100*histo.GetRMS():0.2f}%")
-    
+    """
     for vov in Vovs:
         for thr in thresholds:
             for enBin in enBins:
@@ -449,7 +459,7 @@ if(new_selection):
                 c3.Update()
                 c3.SaveAs(outdir + "/summaryPlots/timeResolution/c_timeRes_singles_" + label + ".png")
                 c3.SaveAs(outdir + "/summaryPlots/timeResolution/c_timeRes_singles_" + label + ".pdf")    
-
+ """   
     for vov in Vovs:
         for enBin in enBins:
             for hit in Hits:
@@ -491,13 +501,48 @@ if(new_selection):
                 c01.SaveAs(outdir + "/summaryPlots/timeResolution/" + label + ".png")
                 c01.SaveAs(outdir + "/summaryPlots/timeResolution/" + label + ".pdf")
             
-        
+    timeRes_thBest_vs_bin={}   
     print("Average time resolution at best th for: ")
     for key,graph in g_deltaT_bestth_vs_bars.items():
         vov, enBin, hit = key
         leg = ROOT.TLegend(0.20, 0.90, 0.60, 0.70)
+
+        label3=f"Vov{vov}_bestTh_enBin{enBin}_{hit}Hits"
+        c3=ROOT.TCanvas(f"c_tRes_spread_"+label3,"",800,600)
+        c3.SetGrid()
+        c3.SetLeftMargin(0.15)
+        c3.SetBottomMargin(0.15)
+        histo=ROOT.TH1F("tRes_spread"+label3,"",20,-0.5,0.5)
+
+        fitRes=ROOT.TF1("fitRes",'pol0',1,13)
+        graph.Fit(fitRes,"QRN")#quite range no-store
+        #print(f"Vov{vov} enBin{enBin} hits{hit}: {fitRes.GetParameter(0):.01f} [ps]")
+        tRes_ave=fitRes.GetParameter(0)
+
+        for i in range(1,13):
+            x = ctypes.c_double()
+            tRes = ctypes.c_double()
+            graph.GetPoint(i, x, tRes)
+            tRes=tRes.value
+            if(tRes==0):
+                spread=0
+            else:
+                spread=(tRes-tRes_ave)/tRes
+            histo.Fill(spread)
+        histo.GetXaxis().SetTitle("#frac{#sigma_{t}-<#sigma_{t}>}{#sigma_{t}}")
+        histo.Draw()
+        latex3 = ROOT.TLatex()
+        latex3.SetNDC()  # coordinate normalizzate (0-1)
+        latex3.SetTextSize(0.04)
+        latex3.SetTextColor(ROOT.kRed)
+        
+        latex3.DrawLatex(0.15, 0.85, f"RMS: {histo.GetRMS():0.4f}")#(in alto a sinistra)
+        c3.Update()
+        c3.SaveAs(outdir+"/summaryPlots/timeResolution/c_timeRes_spread_"+label+".png")
+        c3.SaveAs(outdir+"/summaryPlots/timeResolution/c_timeRes_spread_"+label+".pdf")
+        
         c2=ROOT.TCanvas(f"c_timeRes_bestTh_corr_Vov{vov}_enBin{enBin}_{hit}Hits","",800,600)
-        c2.SetGrid()
+        c2.SetGrid(0,1)
         c2.SetLeftMargin(0.15)
         c2.SetBottomMargin(0.15)
         graph.SetTitle("")
@@ -511,47 +556,67 @@ if(new_selection):
         graph.SetMarkerColor(ROOT.kGreen)
 
         graph.Draw("AP")
-        fitRes=ROOT.TF1("fitRes",'pol0',1,13)
-        graph.Fit(fitRes,"QRN")#quite range no-store
-        #print(f"Vov{vov} enBin{enBin} hits{hit}: {fitRes.GetParameter(0):.01f} [ps]")
-        tRes_ave=fitRes.GetParameter(0)
-
-        line = ROOT.TLine(1,tRes_ave ,13,tRes_ave)
-        line.SetLineColor(ROOT.kBlack)
-        line.SetLineStyle(2)  # linea tratteggiata
-        line.Draw("same")
+        
+        timeRes_thBest_vs_bin[vov,enBin,hit]=[fitRes.GetParameter(0),fitRes.GetParError(0)]
+        fitRes.SetLineColor(ROOT.kGreen+1)
+        fitRes.SetLineWidth(3)
+        fitRes.SetLineStyle(2)
+        fitRes.Draw("same")
+        latex = ROOT.TLatex()
+        latex.SetNDC(True)           # Normalized coordinates
+        latex.SetTextSize(0.03)
+        latex.DrawLatex(0.2, 0.3, "average time resolution: %.2f [ps] spread (RMS): %.2f %%" % (fitRes.GetParameter(0),histo.GetRMS()*100))
         label=f"c_timeRes_corr_Vov{vov}_best_th_enBin{enBin}_{hit}Hits"
+        c2.Update()
         c2.SaveAs(outdir+"/summaryPlots/timeResolution/"+label+".png")
         c2.SaveAs(outdir+"/summaryPlots/timeResolution/"+label+".pdf")
-        label=f"Vov{vov}_bestTh_enBin{enBin}_{hit}Hits"
-        c2=ROOT.TCanvas(f"c_tRes_spread_"+label,"",800,600)
-        c2.SetGrid()
-        c2.SetLeftMargin(0.15)
-        c2.SetBottomMargin(0.15)
-        histo=ROOT.TH1F("tRes_spread"+label,"",20,-0.5,0.5)
-        for i in range(1,14):
-            x = ctypes.c_double()
-            tRes = ctypes.c_double()
-            graph.GetPoint(i, x, tRes)
-            tRes=tRes.value
-            if(tRes==0):
-                spread=0
-            else:
-                spread=(tRes-tRes_ave)/tRes
-            histo.Fill(spread)
-        histo.GetXaxis().SetTitle("#frac{#sigma_{t}-<#sigma_{t}>}{#sigma_{t}}")
-        histo.Draw()
-        latex = ROOT.TLatex()
-        latex.SetNDC()  # coordinate normalizzate (0-1)
-        latex.SetTextSize(0.04)
-        latex.SetTextColor(ROOT.kRed)
-        latex.DrawLatex(0.15, 0.85, f"RMS: {histo.GetRMS():0.4f}")#(in alto a sinistra)
-        c2.Update()
-        c2.SaveAs(outdir+"/summaryPlots/timeResolution/c_timeRes_spread_"+label+".png")
-        c2.SaveAs(outdir+"/summaryPlots/timeResolution/c_timeRes_spread_"+label+".pdf")
         if(tRes_ave==0 ): continue
         else:
             print(f"Vov{vov} enBin{enBin} hits{hit}: {tRes_ave:.01f} [ps] spread (RMS) of {100*histo.GetRMS():0.2f}%")
+
+    for vov in Vovs:
+        for enBin in enBins:
+            for hit in Hits:
+                index=g_deltaT_thBest_vs_enBin[vov,hit].GetN()
+                g_deltaT_thBest_vs_enBin[vov,hit].SetPoint(index,enBinsCenter[enBin],timeRes_thBest_vs_bin[vov,enBin,hit][0])
+                g_deltaT_thBest_vs_enBin[vov,hit].SetPointError(index,0,timeRes_thBest_vs_bin[vov,enBin,hit][1])
+    
+    for key, graph in g_deltaT_thBest_vs_enBin.items():
+        vov, hit = key
+        c2 = ROOT.TCanvas("c_timeRes_bestTh_vs_enBin_Vov%.2f_%02dHits" % (vov, hit), "", 800, 600)
+        c2.cd()
+
+        hPad1 = ROOT.TH2F("hPad_Vov%.2f_%02dHits" % (enBin, hit), '', 100, 0.0, 2.5, 100, 0, 140)
+        hPad1.SetTitle("; energyRatio; #sigma_{t} [ps]")
+        hPad1.Draw()
+
+        #c2.SetGridy()
+        c2.SetLeftMargin(0.15)
+        c2.SetBottomMargin(0.15)
+        
+        # energy ratio bins
+        lines = []
+        xlines = [0.3, 0.8, 1.3, 1.8, 2.3]
+        for x in xlines:
+            line = ROOT.TLine(x, 0, x, 140)   # (x, ymin, x, ymax)
+            line.SetLineColor(ROOT.kRed+2)
+            line.SetLineStyle(2) 
+            line.Draw("same")
+            lines.append(line)
+
+        graph.SetTitle("")
+        graph.GetXaxis().SetTitle("energyRatio")
+        graph.GetYaxis().SetTitle("#sigma_{t} [ps]")
+        graph.GetXaxis().SetRangeUser(0, 2.50)
+        graph.GetYaxis().SetRangeUser(0, 140)
+        graph.SetMarkerStyle(20)
+        graph.SetMarkerSize(1.2)
+        graph.SetLineWidth(2)
+        graph.SetMarkerColor(ROOT.kRed+1)
+        graph.Draw("P same")
+        label = "c_timeRes_thBest_vs_enBin_Vov%0.2f_%02dHits" % (vov, hit)
+        c2.SaveAs(outdir + "/summaryPlots/timeResolution/" + label + ".png")
+        c2.SaveAs(outdir + "/summaryPlots/timeResolution/" + label + ".pdf")
 
     # --- print time resolution for central bars
     print("Time resolution for central bars(6,7,8): ")
@@ -565,8 +630,8 @@ if(new_selection):
                             pass
                             #print(f" Bar {bar:02d} Vov{vov:.2f} th{th:02d} enBin{enBin} {hit}Hits: ({tRes_all[bar,vov,th,enBin,hit][0]:.2f} +/- {tRes_all[bar,vov,th,enBin,hit][1]:.2f}) [ps]")
 
-
 # ---------- old selection
+"""
 else:
     for vov in Vovs:
         for thr in thresholds:
@@ -751,7 +816,7 @@ else:
         c2.SaveAs(outdir+"/summaryPlots/timeResolution/c_timeRes_spread_"+label+".pdf")
 
         print(f"Vov{vov} th{thr} enBin{enBin}: {tRes_ave:.01f} [ps] spread (RMS) of {100*histo.GetRMS():0.2f}%")
-
+"""
 
 
 
